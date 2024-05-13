@@ -12,7 +12,7 @@ phases:
     commands:
       - echo "Zipping Deployment Package"
       - cd lambdafunction
-      - zip -r ../car_network_build_package.zip lambda_function.py
+      - zip -r ../search_service_build_package.zip lambda_function.py
       - zip -r ../dependency_layer.zip python/
       - cd ..
   post_build: 
