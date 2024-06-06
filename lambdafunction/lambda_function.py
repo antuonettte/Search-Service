@@ -1,6 +1,7 @@
 import json
 import boto3
 import pymysql
+import logging
 
 # Constants
 POSTS_DB_HOST = 'car-network-db.c5kgayasi5x2.us-east-1.rds.amazonaws.com'
@@ -13,16 +14,25 @@ MEDIA_DB_USER = 'admin'
 MEDIA_DB_PASSWORD = 'FrostGaming1!'
 MEDIA_DB_NAME = 'media_metadata_db'
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 def lambda_handler(event, context):
     try:
         http_method = event['httpMethod']
         
         if http_method == 'GET':
+            logger.info("GET Method")
             query_parameters = event.get('queryStringParameters', {})
             
+            logger.info("Query Params")
+            logger.info(query_parameters)
+            
             if query_parameters and 'username' in query_parameters:
+                logger.info("Search posts by username")
                 return search_posts_by_username(query_parameters['username'])
             elif query_parameters and 'content' in query_parameters:
+                logger.info("Search posts by content")
                 return search_posts_by_content(query_parameters['content'])
             else:
                 return {
@@ -81,11 +91,14 @@ def get_posts_by_username(username):
                                  user=POSTS_DB_USER,
                                  password=POSTS_DB_PASSWORD,
                                  database=POSTS_DB_NAME)
+    
+    logger.info("Get Posts by username")
     try:
         with connection.cursor() as cursor:
             sql = "SELECT post_id, user_id, username, content FROM posts WHERE username LIKE %s"
             cursor.execute(sql, ('%' + username + '%',))
             results = cursor.fetchall()
+        logger.info(results)
         return results
     except Exception as e:
         connection.rollback()
@@ -98,11 +111,13 @@ def get_posts_by_content(content):
                                  user=POSTS_DB_USER,
                                  password=POSTS_DB_PASSWORD,
                                  database=POSTS_DB_NAME)
+    logger.info("get posts by content")
     try:
         with connection.cursor() as cursor:
             sql = "SELECT post_id, user_id, username, content FROM posts WHERE content LIKE %s"
             cursor.execute(sql, ('%' + content + '%',))
             results = cursor.fetchall()
+        logger.info(results)
         return results
     except Exception as e:
         connection.rollback()
@@ -143,85 +158,4 @@ def combine_posts_with_media(posts, media_metadata):
     
     return posts
 
-def lambda_handler(event, context):
-    try:
-        http_method = event['httpMethod']
-        
-        if http_method == 'GET':
-            query_parameters = event.get('queryStringParameters', {})
-            
-            if 'username' in query_parameters:
-                return search_posts_by_username(query_parameters['username'])
-            elif 'content' in query_parameters:
-                return search_posts_by_content(query_parameters['content'])
-            else:
-                return {
-                    'statusCode': 400,
-                    'body': json.dumps({'error': 'Missing required query parameters'})
-                }
-        else:
-            return {
-                'statusCode': 405,
-                'body': json.dumps({'error': 'Method Not Allowed'})
-            }
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'body': json.dumps({'error': str(e)})
-        }
 
-def search_posts_by_username(username):
-    connection = pymysql.connect(host=DB_HOST,
-                                 user=DB_USER,
-                                 password=DB_PASSWORD,
-                                 database=DB_NAME)
-    try:
-        with connection.cursor() as cursor:
-            sql = """
-            SELECT p.post_id, p.user_id, p.username, p.content, m.s3_key, m.url, m.size, m.type
-            FROM posts p
-            LEFT JOIN media_metadata m ON p.post_id = m.post_id
-            WHERE p.username LIKE %s
-            """
-            cursor.execute(sql, ('%' + username + '%',))
-            results = cursor.fetchall()
-
-        connection.commit()
-        
-        return {
-            'statusCode': 200,
-            'body': json.dumps({'results': results})
-        }
-    except Exception as e:
-        connection.rollback()
-        raise e
-    finally:
-        connection.close()
-
-def search_posts_by_content(content):
-    connection = pymysql.connect(host=DB_HOST,
-                                 user=DB_USER,
-                                 password=DB_PASSWORD,
-                                 database=DB_NAME)
-    try:
-        with connection.cursor() as cursor:
-            sql = """
-            SELECT p.post_id, p.user_id, p.username, p.content, m.s3_key, m.url, m.size, m.type
-            FROM posts p
-            LEFT JOIN media_metadata m ON p.post_id = m.post_id
-            WHERE p.content LIKE %s
-            """
-            cursor.execute(sql, ('%' + content + '%',))
-            results = cursor.fetchall()
-
-        connection.commit()
-        
-        return {
-            'statusCode': 200,
-            'body': json.dumps({'results': results})
-        }
-    except Exception as e:
-        connection.rollback()
-        raise e
-    finally:
-        connection.close()

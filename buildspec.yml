@@ -14,7 +14,7 @@ phases:
       - cd lambdafunction
       - zip -r ../dependency_layer.zip python/
       - rm -rf python/
-      - zip -r ../search_service_build_package.zip .
+      - zip -r ../search_service_build_package.zip lambda_function.py
       - cd ..
   post_build: 
     commands:
