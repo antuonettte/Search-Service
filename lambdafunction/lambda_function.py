@@ -7,7 +7,7 @@ import logging
 POSTS_DB_HOST = 'car-network-db.c5kgayasi5x2.us-east-1.rds.amazonaws.com'
 POSTS_DB_USER = 'admin'
 POSTS_DB_PASSWORD = 'FrostGaming1!'
-POSTS_DB_NAME = 'posts_db'
+POSTS_DB_NAME = 'post_db'
 
 MEDIA_DB_HOST = 'car-network-db.c5kgayasi5x2.us-east-1.rds.amazonaws.com'
 MEDIA_DB_USER = 'admin'
@@ -53,7 +53,10 @@ def lambda_handler(event, context):
 def search_posts_by_username(username):
     try:
         posts = get_posts_by_username(username)
-        post_ids = [post['post_id'] for post in posts]
+        logger.info("posts: ")
+        logger.info(posts)
+        logger.info("separating post IDs")
+        post_ids = [post['id'] for post in posts]
         media_metadata = get_media_metadata_by_post_ids(post_ids)
         
         combined_results = combine_posts_with_media(posts, media_metadata)
@@ -71,7 +74,8 @@ def search_posts_by_username(username):
 def search_posts_by_content(content):
     try:
         posts = get_posts_by_content(content)
-        post_ids = [post['post_id'] for post in posts]
+        logger.info("separating post IDs")
+        post_ids = [post['id'] for post in posts]
         media_metadata = get_media_metadata_by_post_ids(post_ids)
         
         combined_results = combine_posts_with_media(posts, media_metadata)
@@ -95,11 +99,21 @@ def get_posts_by_username(username):
     logger.info("Get Posts by username")
     try:
         with connection.cursor() as cursor:
-            sql = "SELECT post_id, user_id, username, content FROM posts WHERE username LIKE %s"
+            sql = "SELECT id, user_id, username, content FROM posts WHERE LOWER(username) LIKE LOWER( %s )"
             cursor.execute(sql, ('%' + username + '%',))
             results = cursor.fetchall()
-        logger.info(results)
-        return results
+            post_list = []
+            for post in results:
+                post_dict = {
+                    "id":post[0],
+                    "user_id":post[1],
+                    "username":post[2],
+                    "content":post[3]
+                }
+                post_list.append(post_dict)
+            
+        logger.info(post_list)
+        return post_list
     except Exception as e:
         connection.rollback()
         raise e
@@ -114,7 +128,7 @@ def get_posts_by_content(content):
     logger.info("get posts by content")
     try:
         with connection.cursor() as cursor:
-            sql = "SELECT post_id, user_id, username, content FROM posts WHERE content LIKE %s"
+            sql = "SELECT id, user_id, username, content FROM posts WHERE content LIKE %s"
             cursor.execute(sql, ('%' + content + '%',))
             results = cursor.fetchall()
         logger.info(results)
@@ -133,11 +147,14 @@ def get_media_metadata_by_post_ids(post_ids):
                                  user=MEDIA_DB_USER,
                                  password=MEDIA_DB_PASSWORD,
                                  database=MEDIA_DB_NAME)
+    logger.info("Get metadata for media in post")
     try:
         with connection.cursor() as cursor:
             sql = "SELECT post_id, s3_key, url, size, type FROM media_metadata WHERE post_id IN %s"
             cursor.execute(sql, (post_ids,))
             results = cursor.fetchall()
+            logger.info("media metadata")
+            logger.info(results)
         return results
     except Exception as e:
         connection.rollback()
@@ -146,6 +163,7 @@ def get_media_metadata_by_post_ids(post_ids):
         connection.close()
 
 def combine_posts_with_media(posts, media_metadata):
+    logger.info("Combining media to the post")
     media_dict = {}
     for media in media_metadata:
         post_id = media['post_id']
