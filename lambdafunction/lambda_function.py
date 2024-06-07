@@ -59,12 +59,14 @@ def search_posts_by_username(username):
         post_ids = [post['id'] for post in posts]
         media_metadata = get_media_metadata_by_post_ids(post_ids)
         
-        combined_results = combine_posts_with_media(posts, media_metadata)
         
+        combined_results = combine_posts_with_media(posts, media_metadata)
+    
         return {
             'statusCode': 200,
             'body': json.dumps({'results': combined_results})
         }
+        
     except Exception as e:
         return {
             'statusCode': 500,
@@ -148,14 +150,28 @@ def get_media_metadata_by_post_ids(post_ids):
                                  password=MEDIA_DB_PASSWORD,
                                  database=MEDIA_DB_NAME)
     logger.info("Get metadata for media in post")
+    post_id_tuple = tuple(post_ids)
     try:
         with connection.cursor() as cursor:
-            sql = "SELECT post_id, s3_key, url, size, type FROM media_metadata WHERE post_id IN %s"
-            cursor.execute(sql, (post_ids,))
+            sql = "select user_id, post_id, s3_key, url, size, type  from media_metadata where post_id in %s"
+            cursor.execute(sql, (post_id_tuple,))
             results = cursor.fetchall()
             logger.info("media metadata")
             logger.info(results)
-        return results
+            media_list = []
+            for media in results:
+                media_dict = {
+                    "user_id": media[0],
+                    "post_id": media[1],
+                    "s3_key": media[2],
+                    "url" : media[3],
+                    "size": media[4],
+                    "type": media[5]
+                }
+                media_list.append(media_dict)
+            logger.info("media list")
+            logger.info(media_list)
+        return media_list
     except Exception as e:
         connection.rollback()
         raise e
@@ -164,6 +180,7 @@ def get_media_metadata_by_post_ids(post_ids):
 
 def combine_posts_with_media(posts, media_metadata):
     logger.info("Combining media to the post")
+    logger.info(media_metadata)
     media_dict = {}
     for media in media_metadata:
         post_id = media['post_id']
@@ -172,7 +189,7 @@ def combine_posts_with_media(posts, media_metadata):
         media_dict[post_id].append(media)
     
     for post in posts:
-        post['media_metadata'] = media_dict.get(post['post_id'], [])
+        post['media_metadata'] = media_dict.get(post['id'], [])
     
     return posts
 
