@@ -36,7 +36,7 @@ def lambda_handler(event, context):
             
             query = query_parameters['query']
             
-            
+            search_posts(query, DOMAIN_ENDPOINT)
             
             # if query_parameters and 'username' in query_parameters:
             #     logger.info("Search posts by username")
