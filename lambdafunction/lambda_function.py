@@ -36,19 +36,8 @@ def lambda_handler(event, context):
             
             query = query_parameters['query']
             
-            search_posts(query, DOMAIN_ENDPOINT)
+            return search(query, DOMAIN_ENDPOINT)
             
-            # if query_parameters and 'username' in query_parameters:
-            #     logger.info("Search posts by username")
-            #     return search_posts_by_username(query_parameters['username'])
-            # elif query_parameters and 'content' in query_parameters:
-            #     logger.info("Search posts by content")
-            #     return search_posts_by_content(query_parameters['content'])
-            # else:
-            #     return {
-            #         'statusCode': 400,
-            #         'body': json.dumps({'error': 'Missing required query parameters'})
-            #     }
         else:
             return {
                 'statusCode': 405,
@@ -60,66 +49,67 @@ def lambda_handler(event, context):
             'body': json.dumps({'error': str(e)})
         }
     
-def search_posts(query, domain_endpoint):
-    url = f"https://{domain_endpoint}/my-index/_search"
+def search(query, domain_endpoint):
+    url = f"https://{domain_endpoint}/_search"
     headers = {"Content-Type": "application/json"}
     payload = {
         "query": {
             "multi_match": {
                 "query": query,
-                "fields": ["username", "content"]
+                "fields": ["username", "content"],
+                "fuzziness": "AUTO"
             }
         }
     }
 
     response = requests.get(url, headers=headers, json=payload)
     logger.info("search response")
-    logger.info(response)
-    return response.json()
-
-def search_posts_by_username(username):
-    try:
-        posts = get_posts_by_username(username)
-        logger.info("posts: ")
-        logger.info(posts)
-        logger.info("separating post IDs")
-        post_ids = [post['id'] for post in posts]
-        media_metadata = get_media_metadata_by_post_ids(post_ids)
-        comments = get_comments_by_post_id(post_ids)
-        
-        combined_results = combine_posts_with_media(posts, comments, media_metadata)
+    search_result = response.json()
+    logger.info(search_result)
     
-        return {
-            'statusCode': 200,
-            'body': json.dumps({'results': combined_results})
-        }
+    processed_results = process_search_results(search_result)
+    
+    return {
+        'statusCode': 200,
+        'body': json.dumps({'mesage':processed_results})
         
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'body': json.dumps({'error': str(e)})
-        }
-
-def search_posts_by_content(content):
-    try:
-        posts = get_posts_by_content(content)
-        logger.info("separating post IDs")
-        post_ids = [post['id'] for post in posts]
-        media_metadata = get_media_metadata_by_post_ids(post_ids)
+    }
+    
+def get_post_ids(posts):
+    post_ids = []
+    
+    for post in post:
+        post_ids.append( post['_source']['id'] ) 
+        
+    return post_ids
+    
+def process_search_results(results):
+    processed_results = defaultdict(list)
+    users = []
+    posts = []
+    tmp_posts = []
+    
+    post_ids = get_post_ids(search_result)
+    
+    if post_ids:
         comments = get_comments_by_post_id(post_ids)
+        media_metadata = get_media_metadata_by_post_ids(post_ids)
         
-        combined_results = combine_posts_with_media(posts, comments, media_metadata)
+        for result in results['hits']['hits']:
+            if result['_index'] == "users"
+                users.append( result['_source'] )
+            elif result['_index'] == "posts"
+                tmp_posts.append( result['_source'] )
         
-        return {
-            'statusCode': 200,
-            'body': json.dumps({'results': combined_results})
-        }
-    except Exception as e: 
-        return {
-            'statusCode': 500,
-            'body': json.dumps({'error': str(e)})
-        }
-
+        posts = combine_posts_with_media(posts, comments, media_metadata)
+    
+    processed_results['users'] = users
+    processed_results['posts'] = posts
+    
+    return processed_results
+    
+    
+    
 def get_posts_by_username(username):
     connection = pymysql.connect(host=POSTS_DB_HOST,
                                  user=POSTS_DB_USER,
@@ -150,24 +140,7 @@ def get_posts_by_username(username):
     finally:
         connection.close()
 
-def get_posts_by_content(content):
-    connection = pymysql.connect(host=POSTS_DB_HOST,
-                                 user=POSTS_DB_USER,
-                                 password=POSTS_DB_PASSWORD,
-                                 database=POSTS_DB_NAME)
-    logger.info("get posts by content")
-    try:
-        with connection.cursor() as cursor:
-            sql = "SELECT id, user_id, username, content FROM posts WHERE content LIKE %s"
-            cursor.execute(sql, ('%' + content + '%',))
-            results = cursor.fetchall()
-        logger.info(results)
-        return results
-    except Exception as e:
-        connection.rollback()
-        raise e
-    finally:
-        connection.close()
+
 
 def get_media_metadata_by_post_ids(post_ids):
     if not post_ids:
