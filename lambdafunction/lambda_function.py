@@ -114,7 +114,7 @@ def search_posts_by_content(content):
             'statusCode': 200,
             'body': json.dumps({'results': combined_results})
         }
-    except Exception as e:
+    except Exception as e: 
         return {
             'statusCode': 500,
             'body': json.dumps({'error': str(e)})
