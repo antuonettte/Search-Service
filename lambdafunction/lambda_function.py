@@ -89,16 +89,16 @@ def process_search_results(results):
     posts = []
     tmp_posts = []
     
-    post_ids = get_post_ids(search_result)
+    post_ids = get_post_ids(results)
     
     if post_ids:
         comments = get_comments_by_post_id(post_ids)
         media_metadata = get_media_metadata_by_post_ids(post_ids)
         
         for result in results['hits']['hits']:
-            if result['_index'] == "users"
+            if result['_index'] == "users":
                 users.append( result['_source'] )
-            elif result['_index'] == "posts"
+            elif result['_index'] == "posts":
                 tmp_posts.append( result['_source'] )
         
         posts = combine_posts_with_media(posts, comments, media_metadata)
