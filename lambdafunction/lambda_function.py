@@ -78,36 +78,46 @@ def search(query, domain_endpoint):
 def get_post_ids(posts):
     post_ids = []
     
-    for post in post:
-        post_ids.append( post['_source']['id'] ) 
+    for post in posts:
+        if post['_index'] == "posts":
+            post_ids.append( post['_source']['id'] ) 
         
     return post_ids
     
 def process_search_results(results):
+    logger.info("Setting Variables")
     processed_results = defaultdict(list)
     users = []
     posts = []
     tmp_posts = []
     
-    post_ids = get_post_ids(results)
-    
-    if post_ids:
-        comments = get_comments_by_post_id(post_ids)
-        media_metadata = get_media_metadata_by_post_ids(post_ids)
+    try:
+        logger.info("Separating Post IDs")
+        post_ids = get_post_ids(results['hits']['hits'])
         
-        for result in results['hits']['hits']:
-            if result['_index'] == "users":
-                users.append( result['_source'] )
-            elif result['_index'] == "posts":
-                tmp_posts.append( result['_source'] )
+        if post_ids:
+            logger.info("Getting comments for the posts")
+            comments = get_comments_by_post_id(post_ids)
+            
+            logger.info("Getting Media Metadata for the posts")
+            media_metadata = get_media_metadata_by_post_ids(post_ids)
+            
+            logger.info("Separating Users and Posts from results")
+            for result in results['hits']['hits']:
+                if result['_index'] == "users":
+                    users.append( result['_source'] )
+                elif result['_index'] == "posts":
+                    tmp_posts.append( result['_source'] )
+            
+            posts = combine_posts_with_media(tmp_posts, comments, media_metadata)
         
-        posts = combine_posts_with_media(posts, comments, media_metadata)
-    
-    processed_results['users'] = users
-    processed_results['posts'] = posts
-    
-    return processed_results
-    
+        processed_results['users'] = users
+        processed_results['posts'] = posts
+        
+        return processed_results
+    except Exception as e:
+        logger.info(str(e))
+        raise e
     
     
 def get_posts_by_username(username):
